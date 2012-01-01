@@ -3,8 +3,12 @@
 // Set the following parameters
 $tumblrEmail = '';
 $tumblrPassword = '';
-$file = '';
+$file = ''; // location of exported wordpress xml
+$categories = array(); // ex blog, news, videos
+$oldDomain = ''; // ex mywordpress.com (set this if you want relative links in posts converted to absolute before importing… note this should only be done if your old site will be set up to forward links to your new one.)
 
+
+$resolver = array();
 $tumblr = new Tumblr();
 $tumblr->setCredentials($tumblrEmail, $tumblrPassword);
 
@@ -37,15 +41,61 @@ class WordpressToTumblr {
 
     public function postToTumblr() {
 
+		global $resolver, $categories;
+
         $ns = $this->xml->getNamespaces(true);
-        foreach ($this->xml->channel[0]->item as $item) {
+        foreach ($this->xml->channel[0]->item as $item) 
+        {
+        	// skip drafts and other unpublished content
+            if ((string)$item->children($ns['wp'])->status != 'publish')
+            	continue;
+            	
+            // only take posts from specific categories
+            if ($categories)
+            {
+	            $title = $item->xpath('category');
+	            if (!in_array((string)$title[1]['nicename'], $categories))
+	            	continue;
+			}
+			        	
+        	// get the title and body
             $title = (string)$item->title;
             $body = (string)$item->children($ns['content'])->encoded;
-            $pubDate = (string)$item->children($ns['wp'])->post_date;
-            $this->tumblr->postRegular( $title , $body, array('date' => $pubDate));
+            
+            // get the extra parameters
+            $params = array(
+            	'date' 		=>	(string)$item->children($ns['wp'])->post_date,
+            	'slug'		=> 	(string)$item->children($ns['wp'])->post_name,
+            );
+            
+            // get the tags
+            $tags = array();
+            $tagNodes = $item->children($ns['category']);
+            foreach($tagNodes as $child)
+			{
+				if ($child['domain'] == 'tag' && $child['nicename'])
+					$tags[(string)$child['nicename']] = (string)$child['nicename'];
+			}
+			if ($tags)
+				$params['tags'] = join(',', $tags);
+				
+			// change relative urls to absolute (pointing to old wordpress site)
+			if ($oldDomain)
+				$body = str_replace('href="/', 'href="http://'.$oldDomain.'/', $body);
+            
+            // post it
+            $postId = $this->tumblr->postRegular( $title , $body, $params);
+            
+            // get link
+            $node = $item->xpath('link');
+            $resolver[(string)$node[0]] = '/post/'.$postId.'/'.$params['slug'];
         }
+    
+    	foreach($resolver as $key => $item)
+		{
+			print "'$key' => '$item',\n";
+		}
     }
-
 }
 
 class Tumblr {
@@ -112,7 +162,7 @@ class Tumblr {
             echo "Success! The request executed succesfully.\n";
             return $result;
         } else if ($status == 403) {
-            echo 'Bad email or password';            
+            echo 'Bad email or password';
             return false;
         } else {
             echo "Error: $result\n";
