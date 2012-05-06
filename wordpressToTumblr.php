@@ -1,9 +1,9 @@
 <?php
 
 // Set the following parameters
-$tumblrEmail = '';
-$tumblrPassword = '';
-$file = ''; // location of exported wordpress xml
+$tumblrEmail = 'eatme@laboca.co.uk';
+$tumblrPassword = 'l4b0c4site';
+$file = 'file:///Users/scotbendall%201/Downloads/wordpress.2012-05-06%281%29.xml'; // location of exported wordpress xml
 $categories = array(); // ex blog, news, videos
 $oldDomain = ''; // ex mywordpress.com (set this if you want relative links in posts converted to absolute before importing… note this should only be done if your old site will be set up to forward links to your new one.)
 
